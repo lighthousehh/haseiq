@@ -7,7 +7,7 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntries
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -19,18 +19,16 @@ from .coordinator import IQStoveCoordinator
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntries.ConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ):
     """Setup sensors from a config entry created in the integrations UI."""
-    # get coordinator object from hass.data
     coordinator: IQStoveCoordinator = entry.runtime_data
-    # create a IQStoveSensor entity for all state commands except 'appErr'
     validCommands = ["appT", "appPhase", "appP", "appAufheiz"]
     sensors = [
         IQstoveSensor(coordinator, cmd)
         for cmd in coordinator.stove.Commands.state
-        if (cmd in validCommands)
+        if cmd in validCommands
     ]
     async_add_entities(sensors, update_before_add=True)
 
@@ -54,9 +52,8 @@ class IQstoveSensor(CoordinatorEntity, SensorEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        # set native value to latest value
-        self._attr_native_value = self.coordinator.data[self.cmd]
-        # tell homeassistant to update state
+        if self.coordinator.data and self.cmd in self.coordinator.data:
+            self._attr_native_value = self.coordinator.data[self.cmd]
         self.async_write_ha_state()
 
     @property
@@ -75,16 +72,26 @@ class IQstoveSensor(CoordinatorEntity, SensorEntity):
         return "undefined"
 
     @property
-    def native_value(self) -> int | float:
+    def native_value(self) -> int | float | str | None:
         """Return the state of the entity."""
-        # for appPhase return a string from optionsEnums
+        if not self.coordinator.data or self.cmd not in self.coordinator.data:
+            return None
+        value = self.coordinator.data[self.cmd]
+        if value is None:
+            return None
         if self.cmd == "appPhase":
-            return self.optionEnums[int(self.coordinator.data[self.cmd])]
-        return float(self.coordinator.data[self.cmd])
+            try:
+                return self.optionEnums[int(value)]
+            except (ValueError, IndexError):
+                return None
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
 
     @property
     def native_unit_of_measurement(self) -> str | None:
-        """Return unit of measurment."""
+        """Return unit of measurement."""
         if self.cmd == "appT":
             return UnitOfTemperature.CELSIUS
         return None
@@ -92,8 +99,7 @@ class IQstoveSensor(CoordinatorEntity, SensorEntity):
     @property
     def state_class(self) -> str | None:
         """Return state class."""
-        # https://developers.home-assistant.io/docs/core/entity/sensor/#available-state-classes
-        if not self.cmd == "appPhase":
+        if self.cmd != "appPhase":
             return SensorStateClass.MEASUREMENT
         return None
 
@@ -107,7 +113,7 @@ class IQstoveSensor(CoordinatorEntity, SensorEntity):
         return None
 
     @property
-    def options(self) -> str | None:
+    def options(self) -> list[str] | None:
         """Return ENUM options."""
         if self.cmd == "appPhase":
             return ["idle", "heating up", "burning", "add wood", "don't add wood"]
@@ -116,23 +122,19 @@ class IQstoveSensor(CoordinatorEntity, SensorEntity):
     @property
     def unique_id(self) -> str:
         """Return unique id."""
-        # All entities must have a unique id.  Think carefully what you want this to be as
-        # changing it later will cause HA to create new entities.
         return f"{DOMAIN}-sensor-{self.cmd}"
 
     @property
     def device_info(self):
         """Return device information about this entity."""
+        data = self.coordinator.data or {}
         return {
-            "identifiers": {
-                # Unique identifiers within a specific domain
-                (DOMAIN, self.coordinator.data["_oemser"])
-            },
+            "identifiers": {(DOMAIN, data.get("_oemser", "unknown"))},
             "manufacturer": "Hase",
-            "model": "Sila Plus" if self.coordinator.data["_oemdev"] == "6" else None,
-            "model_id": self.coordinator.data["_oemdev"],
-            "name": f"Stove {self.coordinator.data["_oemser"]}",
-            "serial_number": self.coordinator.data["_oemser"],
-            "sw_version": f"Wifi {self.coordinator.data["_wversion"]}",
-            "hw_version": f"Controller {self.coordinator.data["_oemver"]}",
+            "model": "Sila Plus" if data.get("_oemdev") == "6" else None,
+            "model_id": data.get("_oemdev"),
+            "name": f"Stove {data.get('_oemser', 'unknown')}",
+            "serial_number": data.get("_oemser"),
+            "sw_version": f"Wifi {data.get('_wversion', '?')}",
+            "hw_version": f"Controller {data.get('_oemver', '?')}",
         }

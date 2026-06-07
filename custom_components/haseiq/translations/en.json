@@ -1,0 +1,30 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Hase iQ Stove",
+        "data": {
+          "host": "IP address or hostname"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Hase iQ Stove",
+        "data": {
+          "host": "IP address or hostname"
+        }
+      },
+      "confirm": {
+        "description": "Do you want to set up the Hase iQ Stove?"
+      }
+    },
+    "error": {
+      "connection_error": "Failed to connect to the stove. Is it powered on and reachable?",
+      "invalid_host": "Invalid IP address or hostname.",
+      "unknown_error": "Unknown error occurred."
+    },
+    "abort": {
+      "single_instance_allowed": "Already configured. Only a single configuration possible.",
+      "no_devices_found": "No devices found on the network."
+    }
+  }
+}

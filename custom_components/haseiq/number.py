@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-from homeassistant.components.number import (
-    NumberEntity,
-    NumberDeviceClass,
-)
+from homeassistant.components.number import NumberEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -78,8 +74,11 @@ class IQstoveNumberEntity(CoordinatorEntity, NumberEntity):
         return f"{DOMAIN}-number-{self.cmd}"
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set new value."""
-        self.coordinator.stove.setValue(self.cmd, int(value))
+        """Send new value to stove and request readback."""
+        await self.coordinator.stove._send_set(self.cmd, int(value))
+        # Wert direkt zurücklesen zur Bestätigung vom Gerät
+        self.coordinator.stove.getValue(self.cmd)
+        # Optimistisch UI updaten bis Coordinator nächstes Update liefert
         self._attr_native_value = value
         self.async_write_ha_state()
 

@@ -210,7 +210,7 @@ class IQstove:
         """Return the websocket URL."""
         return f"ws://{self._host}:{self._port}{self._path}"
 
-    async def _wait_connected(self, timeout: float = 5.0) -> None:
+"""    async def _wait_connected(self, timeout: float = 5.0) -> None:
         """Wait briefly for the connection to become ready.
 
         Raises:
@@ -223,7 +223,7 @@ class IQstove:
             waited += step
         if not self.connected:
             raise IQStoveConnectionError("Failed to establish websocket connection")
-
+"""
     async def _ensure_session(self) -> ClientSession:
         """Return an aiohttp session, creating one if necessary."""
         if self._session and not self._session.closed:

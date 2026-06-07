@@ -1,7 +1,4 @@
-"""Manage data fetching and updates for the IQ Stove integration.
-
-The IQStoveCoordinator class handles communication and state updates for the IQ Stove in Home Assistant.
-"""
+"""Manage data fetching and updates for the IQ Stove integration."""
 
 import asyncio
 from datetime import timedelta
@@ -9,7 +6,7 @@ import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN
 from .IQstove import IQstove, IQStoveConnectionError
@@ -27,10 +24,7 @@ class IQStoveCoordinator(DataUpdateCoordinator):
         stove: IQstove,
         update_interval: int = 30,
     ) -> None:
-        """Initialize the coordinator."""
-        # store stove object in self
         self.stove = stove
-
         super().__init__(
             hass,
             _LOGGER,
@@ -39,78 +33,77 @@ class IQStoveCoordinator(DataUpdateCoordinator):
         )
 
     async def _async_setup(self):
-        """Fetch data for the first time before any platform entities are created."""
+        """Set up the coordinator. Does NOT fail if the stove is offline."""
+        _LOGGER.debug("Starting stove setup...")
         try:
-            _LOGGER.debug("Starting stove setup...")
-            # if stove not connected, await reconnect and restart listener task
-            if not self.stove.connected:
-                await self.stove.connect()
-                _LOGGER.debug("Stove connected successfully")
+            await self.stove.connect()
+            _LOGGER.debug("Stove connected successfully during setup")
 
-            # Fetch all data which we only need once
-            for cmd in self.stove.Commands.info:
+            for cmd in self.stove.Commands.info + self.stove.Commands.state:
                 self.stove.getValue(cmd)
-                _LOGGER.debug("Started fetching info command: %s", cmd)
 
-            # Fetch all state data from stove
-            for cmd in self.stove.Commands.state:
-                self.stove.getValue(cmd)
-                _LOGGER.debug("Started fetching state command: %s", cmd)
-
-            # Wait until values are populated or timeout occurs
-            timeout = 10  # Maximum wait time in seconds
-            interval = 0.1  # Check interval in seconds
-            elapsed_time = 0
-
+            # Wait up to 10 s for values to arrive
+            timeout = 10.0
+            interval = 0.1
+            elapsed = 0.0
             while (
                 not self._are_values_populated(
                     self.stove.Commands.info + self.stove.Commands.state
                 )
-                and elapsed_time < timeout
+                and elapsed < timeout
             ):
                 await asyncio.sleep(interval)
-                elapsed_time += interval
-                _LOGGER.debug(
-                    "Waiting for values to populate... (%s seconds elapsed)",
-                    elapsed_time,
-                )
+                elapsed += interval
 
             if not self._are_values_populated(
                 self.stove.Commands.info + self.stove.Commands.state
             ):
-                _LOGGER.error("Values failed to populate within the timeout period")
-                raise TimeoutError("IQStove values did not populate in time")
+                _LOGGER.warning(
+                    "Stove values did not fully populate during setup "
+                    "(stove may still be warming up). Continuing anyway."
+                )
 
-            _LOGGER.debug("Stove setup completed successfully")
-
-        except Exception as e:
-            _LOGGER.error("Error during setup: %s", e)
+        except IQStoveConnectionError:
+            # Stove is offline — set up succeeds, entities become unavailable.
+            # _async_update_data will reconnect once the stove powers on.
+            _LOGGER.warning(
+                "Stove is not reachable during setup. "
+                "Entities will be unavailable until the stove is switched on."
+            )
+        except Exception as exc:
+            _LOGGER.error("Unexpected error during setup: %s", exc)
+            # Only re-raise for truly unexpected errors, not connection issues
             raise
 
     def _are_values_populated(self, commands):
-        """Check if the required commands have been populated in the stove's values."""
         return all(
             cmd in self.stove.values and self.stove.values[cmd] is not None
             for cmd in commands
         )
 
     async def _async_update_data(self):
-        """Fetch data from the IQ Stove. Return data to callback '_handle_coordinator_update' in platform."""
+        """Fetch data – reconnects automatically if the stove was offline."""
         try:
-            _LOGGER.debug("Starting data update")
-            # if stove not connected, await reconnect and restart listener task
             if not self.stove.connected:
+                _LOGGER.debug("Stove not connected, attempting reconnect...")
                 await self.stove.connect()
-                _LOGGER.debug("Stove reconnected successfully")
-            # get all state data from stove
+                _LOGGER.info("Stove reconnected successfully")
+                # After reconnect: also re-fetch info (e.g. after stove reboot)
+                for cmd in self.stove.Commands.info:
+                    self.stove.getValue(cmd)
+
             for cmd in self.stove.Commands.state:
-                await self.stove.getValue(cmd)
-                _LOGGER.debug("Started fetching state command: %s", cmd)
-            # give a little bit of time for the stove to respond and update values
-            # await asyncio.sleep(0.1)
+                self.stove.getValue(cmd)
+
             _LOGGER.debug("Data update completed successfully")
-        except IQStoveConnectionError as e:
-            _LOGGER.error("Connection error from IQStove: %s", e)
-        except Exception as e:
-            _LOGGER.error("Unexpected error during data update: %s", e)
+
+        except IQStoveConnectionError as exc:
+            # Stove is still off → entities stay unavailable, no error spam
+            _LOGGER.debug("Stove not reachable during update (still off?): %s", exc)
+            raise UpdateFailed(f"Stove not reachable: {exc}") from exc
+
+        except Exception as exc:
+            _LOGGER.error("Unexpected error during data update: %s", exc)
+            raise UpdateFailed(f"Unexpected error: {exc}") from exc
+
         return self.stove.values

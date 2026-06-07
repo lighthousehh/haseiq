@@ -2,12 +2,12 @@
   "domain": "haseiq",
   "name": "Hase iQ",
   "codeowners": [
-    "@Xsez"
+    "@Xsez", "@lighthousehh"
   ],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/Xsez/haseiq/",
-  "issue_tracker": "https://github.com/Xsez/haseiq/issues",
+  "documentation": "https://github.com/lighthousehh/haseiq/",
+  "issue_tracker": "https://github.com/lighthousehh/haseiq/issues",
   "iot_class": "local_polling",
   "requirements": [],
   "zeroconf": [
@@ -16,5 +16,5 @@
       "name": "HASE*"
     }
     ],
-  "version": "0.3.0"
+  "version": "0.3.1"
 }

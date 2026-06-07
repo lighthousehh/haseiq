@@ -209,18 +209,17 @@ class IQstove:
     def _url(self) -> str:
         """Return the websocket URL."""
         return f"ws://{self._host}:{self._port}{self._path}"
-
-    async def _wait_connected(self) -> None:
-    """Wait for the connection to become ready, using configured connect_timeout."""
-    timeout = self._connect_timeout  # statt hardcoded 5.0
-    step = 0.05
-    waited = 0.0
-    while not self.connected and waited < timeout:
-        await asyncio.sleep(step)
-        waited += step
-    if not self.connected:
-        raise IQStoveConnectionError("Failed to establish websocket connection")
         
+    async def _wait_connected(self) -> None:
+        """Wait for the connection to become ready, using configured connect_timeout."""
+        timeout = self._connect_timeout
+        step = 0.05
+        waited = 0.0
+        while not self.connected and waited < timeout:
+            await asyncio.sleep(step)
+            waited += step
+        if not self.connected:
+            raise IQStoveConnectionError("Failed to establish websocket connection")        
 
     async def _ensure_session(self) -> ClientSession:
         """Return an aiohttp session, creating one if necessary."""

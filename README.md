@@ -1,6 +1,6 @@
 # Hase IQ Stove Home Assistant integration
 Custom component to integrate [Hase IQ Stoves](https://www.hase.de/iq-technologie) into Home Assistant. 
-
+This is a fork from 
 This allows you to monitor various states(current phase, temperature, performance) of the stove at all times and for example create a notification, when the stove needs to be refilled.
 
 ## Installation

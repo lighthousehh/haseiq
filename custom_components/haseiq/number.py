@@ -1,4 +1,4 @@
-"""Platform for sensor integration."""
+"""Platform for number integration."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from homeassistant.components.number import (
     NumberEntity,
     NumberDeviceClass,
 )
-from homeassistant.config_entries import ConfigEntries
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -18,19 +18,17 @@ from .coordinator import IQStoveCoordinator
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntries.ConfigEntry,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ):
-    """Setup sensors from a config entry created in the integrations UI."""
-    # get coordinator object from hass.data
+    """Setup number entities from a config entry created in the integrations UI."""
     coordinator: IQStoveCoordinator = entry.runtime_data
-    # create a IQStoveNumberEntity for _ledBri
     sensors = [IQstoveNumberEntity(coordinator, "_ledBri")]
     async_add_entities(sensors, update_before_add=True)
 
 
 class IQstoveNumberEntity(CoordinatorEntity, NumberEntity):
-    """Representation of a Sensor."""
+    """Representation of a Number Entity."""
 
     def __init__(self, coordinator: IQStoveCoordinator, cmd):
         """Pass coordinator to CoordinatorEntity."""
@@ -42,47 +40,60 @@ class IQstoveNumberEntity(CoordinatorEntity, NumberEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        # set native value to latest value
-        self._attr_native_value = self.coordinator.data[self.cmd]
-        # tell homeassistant to update state
+        if self.coordinator.data and self.cmd in self.coordinator.data:
+            try:
+                self._attr_native_value = float(self.coordinator.data[self.cmd])
+            except (ValueError, TypeError):
+                pass
         self.async_write_ha_state()
 
     @property
     def name(self) -> str:
-        """Return the name of the sensor."""
+        """Return the name of the entity."""
         if self.cmd == "_ledBri":
             return "LED Brightness"
         return "undefined"
 
     @property
-    def native_value(self) -> int | float:
-        """Return the state of the entity."""
-        return float(self.coordinator.data[self.cmd])
+    def native_value(self) -> float | None:
+        """Return the current value."""
+        if not self.coordinator.data or self.cmd not in self.coordinator.data:
+            return None
+        value = self.coordinator.data[self.cmd]
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
 
-    async def async_set_native_value(self, value: float) -> None:
-        """Update the current value."""
-        self.coordinator.stove.setValue(self.cmd, value)
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        """Return unit of measurement."""
+        return None
 
     @property
     def unique_id(self) -> str:
         """Return unique id."""
-        # All entities must have a unique id.  Think carefully what you want this to be as
-        # changing it later will cause HA to create new entities.
-        return f"{DOMAIN}-sensor-{self.cmd}"
+        return f"{DOMAIN}-number-{self.cmd}"
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set new value."""
+        self.coordinator.stove.setValue(self.cmd, int(value))
+        self._attr_native_value = value
+        self.async_write_ha_state()
 
     @property
     def device_info(self):
         """Return device information about this entity."""
+        data = self.coordinator.data or {}
         return {
-            "identifiers": {
-                # Unique identifiers within a specific domain
-                (DOMAIN, self.coordinator.data["_oemser"])
-            },
+            "identifiers": {(DOMAIN, data.get("_oemser", "unknown"))},
             "manufacturer": "Hase",
-            "model": "Sila Plus" if self.coordinator.data["_oemdev"] == "6" else None,
-            "model_id": self.coordinator.data["_oemdev"],
-            "name": f"Stove {self.coordinator.data["_oemser"]}",
-            "serial_number": self.coordinator.data["_oemser"],
-            "sw_version": f"Wifi {self.coordinator.data["_wversion"]}",
-            "hw_version": f"Controller {self.coordinator.data["_oemver"]}",
+            "model": "Sila Plus" if data.get("_oemdev") == "6" else None,
+            "model_id": data.get("_oemdev"),
+            "name": f"Stove {data.get('_oemser', 'unknown')}",
+            "serial_number": data.get("_oemser"),
+            "sw_version": f"Wifi {data.get('_wversion', '?')}",
+            "hw_version": f"Controller {data.get('_oemver', '?')}",
         }

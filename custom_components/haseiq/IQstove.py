@@ -44,7 +44,7 @@ class _Commands:
         "_oemver",
         "_wversion",
         "_oemser",
-        "_ledBri",
+      #  "_ledBri",
     )
 
     # Live state
@@ -55,6 +55,7 @@ class _Commands:
         "appP",  # performance
         "appNach",
         "appErr",
+        "_ledBri",
     )
 
     # Statistics / history

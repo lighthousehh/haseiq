@@ -24,7 +24,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEnt
     # Create coordinator and pass stove object
     coordinator = IQStoveCoordinator(hass, entry, stove, 5)
     _LOGGER.debug("Created IQStoveCoordinator for entry: %s", entry.entry_id)
-    await coordinator.async_config_entry_first_refresh()
+    await coordinator.async_refresh()
     _LOGGER.debug("Coordinator refreshed for entry: %s", entry.entry_id)
     # Store the coordinator in the entry runtime_data
     entry.runtime_data = coordinator

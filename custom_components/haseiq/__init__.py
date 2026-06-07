@@ -18,21 +18,18 @@ PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.NUMBER, Platform.S
 async def async_setup_entry(hass: HomeAssistant, entry: config_entries.ConfigEntry):
     """Set up IQ Stove from a config entry."""
     _LOGGER.debug("Starting setup for entry: %s", entry.entry_id)
-    # Create stove object with host from config entry
+
     stove = IQstove(entry.data["host"], 8080)
-    _LOGGER.debug("Created IQstove object with host: %s", entry.data["host"])
-    # Create coordinator and pass stove object
     coordinator = IQStoveCoordinator(hass, entry, stove, 5)
-    _LOGGER.debug("Created IQStoveCoordinator for entry: %s", entry.entry_id)
+
+    # _async_setup lädt info+state, toleriert wenn Ofen offline ist
+    await coordinator._async_setup()
+    # async_refresh initialisiert coordinator.data (= stove.values)
     await coordinator.async_refresh()
-    _LOGGER.debug("Coordinator refreshed for entry: %s", entry.entry_id)
-    # Store the coordinator in the entry runtime_data
+
     entry.runtime_data = coordinator
-    _LOGGER.debug("Stored coordinator in runtime_data for entry: %s", entry.entry_id)
-    # Setup the platforms provided by the list PLATFORMS
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    _LOGGER.debug("Forwarded entry setups for platforms: %s", PLATFORMS)
-    # Finish
+
     _LOGGER.debug("Setup completed for entry: %s", entry.entry_id)
     return True
 
@@ -56,6 +53,5 @@ async def async_reload_entry(
     """Reload config entry."""
     _LOGGER.debug("Starting reload for entry: %s", entry.entry_id)
     await async_unload_entry(hass, entry)
-    _LOGGER.debug("Unloaded entry: %s", entry.entry_id)
     await async_setup_entry(hass, entry)
     _LOGGER.info("Reloaded entry: %s", entry.entry_id)

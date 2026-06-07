@@ -1,9 +1,26 @@
 {
   "config": {
     "step": {
+      "user": {
+        "title": "Hase iQ Stove einrichten",
+        "data": {
+          "host": "IP-Adresse oder Hostname"
+        }
+      },
+      "reconfigure": {
+        "title": "Hase iQ Stove neu konfigurieren",
+        "data": {
+          "host": "IP-Adresse oder Hostname"
+        }
+      },
       "confirm": {
         "description": "[%key:common::config_flow::description::confirm_setup%]"
       }
+    },
+    "error": {
+      "connection_error": "Verbindung zum Ofen fehlgeschlagen. Ist der Ofen eingeschaltet und erreichbar?",
+      "invalid_host": "Ungültige IP-Adresse oder Hostname.",
+      "unknown_error": "Unbekannter Fehler."
     },
     "abort": {
       "single_instance_allowed": "[%key:common::config_flow::abort::single_instance_allowed%]",
